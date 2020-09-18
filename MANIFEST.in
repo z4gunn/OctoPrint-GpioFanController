@@ -1,0 +1,4 @@
+include README.md
+recursive-include octoprint_gpiofancontroller/templates *
+recursive-include octoprint_gpiofancontroller/translations *
+recursive-include octoprint_gpiofancontroller/static *
