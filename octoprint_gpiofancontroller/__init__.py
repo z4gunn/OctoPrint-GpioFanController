@@ -1,28 +1,51 @@
 # coding=utf-8
 from __future__ import absolute_import
-
-### (Don't forget to remove me)
-# This is a basic skeleton for your plugin's __init__.py. You probably want to adjust the class name of your plugin
-# as well as the plugin mixins it's subclassing from. This is really just a basic skeleton to get you started,
-# defining your plugin as a template plugin, settings and asset plugin. Feel free to add or remove mixins
-# as necessary.
-#
-# Take a look at the documentation on what other plugin mixins are available.
-
 import octoprint.plugin
+from gpiozero import PWMLED
 
-class GpiofancontrollerPlugin(octoprint.plugin.SettingsPlugin,
+class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
+							  octoprint.plugin.SettingsPlugin,
                               octoprint.plugin.AssetPlugin,
                               octoprint.plugin.TemplatePlugin):
 
-	##~~ SettingsPlugin mixin
+	def __init__(self):
+		self.fan = None
+
+	
+	def init_fan(self, pin, frequency):
+		try:
+			self.fan = PWMLED(pin=pin, initial_value=0, frequency=frequency)
+			self._logger.info("FAN Initialized")
+		except:
+			self._logger.error("Error occured while initializing FAN")
+
+
+	def on_after_startup(self):
+		pin = self._settings.get_int(["pin"])
+		freq = self._settings.get_int(["freq"])
+		speed = self._settings.get_float(["speed"])
+		self._logger.info("Pin #: %s" % pin)
+		self._logger.info("Freq:   %s" % freq)
+		self._logger.info("Speed:  %s" % speed)
+		if(pin is not None and freq is not None):
+			self.init_fan(pin, freq)
+
+
+	def on_settings_save(self, data):
+		octoprint.plugin.SettingsPlugin.on_settings_save(self, data)
+		speed = self._settings.get_float(["speed"])
+		self._logger.info("Settings Saved")
+		self._logger.info("Speed : " + str(speed))
+		self.fan.value = speed
+		
 
 	def get_settings_defaults(self):
 		return dict(
-			# put your plugin's default settings here
+			pin=17,
+			freq=100,
+			speed = 0.0,
 		)
 
-	##~~ AssetPlugin mixin
 
 	def get_assets(self):
 		# Define your plugin's asset files to automatically include in the
@@ -33,7 +56,12 @@ class GpiofancontrollerPlugin(octoprint.plugin.SettingsPlugin,
 			less=["less/gpiofancontroller.less"]
 		)
 
-	##~~ Softwareupdate hook
+
+	def get_template_configs(self):
+		return [
+			dict(type="settings", custom_bindings=False)
+		]
+
 
 	def get_update_information(self):
 		# Define the configuration for your plugin to use with the Software Update
@@ -59,13 +87,13 @@ class GpiofancontrollerPlugin(octoprint.plugin.SettingsPlugin,
 # If you want your plugin to be registered within OctoPrint under a different name than what you defined in setup.py
 # ("OctoPrint-PluginSkeleton"), you may define that here. Same goes for the other metadata derived from setup.py that
 # can be overwritten via __plugin_xyz__ control properties. See the documentation for that.
-__plugin_name__ = "Gpiofancontroller Plugin"
+__plugin_name__ = "GPIO FAN Controller"
 
 # Starting with OctoPrint 1.4.0 OctoPrint will also support to run under Python 3 in addition to the deprecated
 # Python 2. New plugins should make sure to run under both versions for now. Uncomment one of the following
 # compatibility flags according to what Python versions your plugin supports!
 #__plugin_pythoncompat__ = ">=2.7,<3" # only python 2
-#__plugin_pythoncompat__ = ">=3,<4" # only python 3
+__plugin_pythoncompat__ = ">=3,<4" # only python 3
 #__plugin_pythoncompat__ = ">=2.7,<4" # python 2 and 3
 
 def __plugin_load__():
