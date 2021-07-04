@@ -7,23 +7,25 @@
 $(function() {
     function GpiofancontrollerViewModel(parameters) {
         var self = this;
+        self.settings = parameters[0];
+        self.speed = ko.observable(0.0);
 
-        // assign the injected parameters, e.g.:
-        // self.loginStateViewModel = parameters[0];
-        // self.settingsViewModel = parameters[1];
-
-        // TODO: Implement your plugin's view model here.
+        self.onUpdateSpeed = function(element, event) {
+            var newSpeed = event.currentTarget.value
+            if(newSpeed) {
+                self.speed(newSpeed)
+                OctoPrint.simpleApiCommand('gpiofancontroller', 'update_speed', {'speed': newSpeed})
+            }
+        }
+    
+        self.onBeforeBinding = function() {
+            //self.speed(self.settings.settings.plugins.gpiofancontroller.speed());      
+        }
     }
 
-    /* view model class, parameters for constructor, container to bind to
-     * Please see http://docs.octoprint.org/en/master/plugins/viewmodels.html#registering-custom-viewmodels for more details
-     * and a full list of the available options.
-     */
     OCTOPRINT_VIEWMODELS.push({
         construct: GpiofancontrollerViewModel,
-        // ViewModels your plugin depends on, e.g. loginStateViewModel, settingsViewModel, ...
-        dependencies: [ /* "loginStateViewModel", "settingsViewModel" */ ],
-        // Elements to bind to, e.g. #settings_plugin_gpiofancontroller, #tab_plugin_gpiofancontroller, ...
-        elements: [ /* ... */ ]
+        dependencies: ["settingsViewModel"],
+        elements: ["#sidebar_plugin_gpiofancontroller"]
     });
 });

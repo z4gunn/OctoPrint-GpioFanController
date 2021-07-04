@@ -1,6 +1,6 @@
 # OctoPrint-GpioFanController
 
-**TODO:** Describe what your plugin does.
+This is a plugin to control an external fan via Raspberry Pi GPIO pin.  This plugin allows you to set the pin number and PWM frequency in the settings and control the FAN speed via sidebar control.
 
 ## Setup
 
@@ -9,9 +9,3 @@ or manually using this URL:
 
     https://github.com/z4gunn/OctoPrint-GpioFanController/archive/master.zip
 
-**TODO:** Describe how to install your plugin, if more needs to be done than just installing it via pip or through
-the plugin manager.
-
-## Configuration
-
-**TODO:** Describe your plugin's configuration options (if any).
