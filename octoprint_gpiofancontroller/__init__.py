@@ -11,25 +11,43 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 
 	def __init__(self):
 		self.fan = None
+		self.speed = 0.0
 
 	
-	def init_fan(self, pin, frequency):
+	def init_fan(self, pin, frequency, speed):
 		try:
-			self.fan = PWMLED(pin=pin, initial_value=0, frequency=frequency)
-			self._logger.info("GPIO FAN Controller Initialized")
+			self.deinit_fan()
+			self.fan = PWMLED(pin=pin, initial_value=speed, frequency=frequency)
+			self._logger.info("PWM pin initialized")
 		except:
-			self._logger.error("Error occured while initializing GPIO FAN Controller")
+			self._logger.error("Error occured while initializing PWM pin")
 
+
+	def deinit_fan(self):
+		try:
+			if(self.fan is not None):
+				self.fan.close()
+				self.fan = None
+				self._logger.info("PWM pin deinitialized")
+		except:
+			self._logger.error("Error occured while deinitializing PWM pin")
+		
 
 	def on_after_startup(self):
-		pin = self._settings.get_int(["pin"])
-		freq = self._settings.get_int(["freq"])
-		if(pin is not None and freq is not None):
-			self.init_fan(pin, freq)
+			pin = self._settings.get_int(["pin"])
+			freq = self._settings.get_int(["freq"])
+			if(pin is not None and freq is not None and self.speed is not None):
+				self.init_fan(pin, freq, self.speed)
 
 
 	def on_settings_save(self, data):
 		octoprint.plugin.SettingsPlugin.on_settings_save(self, data)
+		pin = self._settings.get_int(["pin"])
+		freq = self._settings.get_int(["freq"])
+		if(pin is not None and freq is not None and self.speed is not None):
+			self.init_fan(pin, freq, self.speed)
+		else:
+			self._logger.error("Error occured while initializing PWM pin")
 
 
 	def get_settings_defaults(self):
@@ -60,8 +78,10 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 			speedStr = data.get('speed', None)
 			if speedStr != None:
 				speed = float(speedStr)
-				if speed != None:
-					self.fan.value = speed
+				if speed != None and self.fan != None:
+					self.speed = speed
+					self.fan.value = self.speed
+
 
 	def get_update_information(self):
 		# Define the configuration for your plugin to use with the Software Update
