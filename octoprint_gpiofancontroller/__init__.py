@@ -12,6 +12,9 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 	def __init__(self):
 		self.fan = None
 		self.speed = 0.0
+		self.gcode_command_enable = False
+		self.gcode_index_enable = False
+		self.gcode_fan_index = 4
 
 	
 	def init_fan(self, pin, frequency, speed):
@@ -31,29 +34,55 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 				self._logger.info("PWM pin deinitialized")
 		except:
 			self._logger.error("Error occured while deinitializing PWM pin")
-		
+	
+	def update_fan_speed(self, speed):
+		if self.fan is not None:
+			self.speed = speed
+			self.fan.value = self.speed
+			self._plugin_manager.send_plugin_message(self._identifier, dict(speed=self.speed))
 
 	def on_after_startup(self):
-			pin = self._settings.get_int(["pin"])
-			freq = self._settings.get_int(["freq"])
-			if(pin is not None and freq is not None and self.speed is not None):
-				self.init_fan(pin, freq, self.speed)
+		pin = self._settings.get_int(["pin"])
+		freq = self._settings.get_int(["freq"])
+		if pin is not None and freq is not None and self.speed is not None:
+			self.init_fan(pin, freq, self.speed)
+		gcode_command_enable = self._settings.get_boolean(["gcode_command_enable"])
+		if gcode_command_enable is not None:
+			self.gcode_command_enable = gcode_command_enable
+		gcode_index_enable = self._settings.get_boolean(["gcode_index_enable"])
+		if gcode_index_enable is not None:
+			self.gcode_index_enable = gcode_index_enable
+		gcode_fan_index = self._settings.get_int(["gcode_fan_index"])
+		if gcode_fan_index is not None:
+			self.gcode_fan_index = gcode_fan_index
 
 
 	def on_settings_save(self, data):
 		octoprint.plugin.SettingsPlugin.on_settings_save(self, data)
 		pin = self._settings.get_int(["pin"])
 		freq = self._settings.get_int(["freq"])
-		if(pin is not None and freq is not None and self.speed is not None):
+		if pin is not None and freq is not None and self.speed is not None:
 			self.init_fan(pin, freq, self.speed)
 		else:
 			self._logger.error("Error occured while initializing PWM pin")
+		gcode_command_enable = self._settings.get_boolean(["gcode_command_enable"])
+		if gcode_command_enable is not None:
+			self.gcode_command_enable = gcode_command_enable
+		gcode_index_enable = self._settings.get_boolean(["gcode_index_enable"])
+		if gcode_index_enable is not None:
+			self.gcode_index_enable = gcode_index_enable
+		gcode_fan_index = self._settings.get_int(["gcode_fan_index"])
+		if gcode_fan_index is not None:
+			self.gcode_fan_index = gcode_fan_index
 
 
 	def get_settings_defaults(self):
 		return dict(
 			pin=17,
 			freq=100,
+			gcode_command_enable=False,
+			gcode_index_enable=False,
+			gcode_fan_index=4,
 		)
 
 
@@ -70,17 +99,72 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 			dict(type="settings", custom_bindings=False),
 		]
 
+
 	def get_api_commands(self):
 		return dict(update_speed=["speed"])
+
 
 	def on_api_command(self, command, data):
 		if command == "update_speed":
 			speedStr = data.get('speed', None)
 			if speedStr != None:
 				speed = float(speedStr)
-				if speed != None and self.fan != None:
-					self.speed = speed
-					self.fan.value = self.speed
+				if speed is not None:
+					self.update_fan_speed(speed)
+
+
+	def gcode_parse_speed(self, cmd):
+		params = cmd.split("S")
+		if len(params) != 2:
+			return None
+		else:
+			try:
+				speed = int(params[1].split()[0])
+				if speed < 0 or speed > 255:
+					return None
+				else:
+					return speed / 255
+			except:
+				return None
+
+
+	def gcode_parse_index(self, cmd):
+		params = cmd.split("P")
+		if len(params) != 2:
+			return None
+		else:
+			try:
+				index = int(params[1].split()[0])
+				if index > 0:
+					return index
+				else:
+					return None
+			except:
+				return None
+            
+
+	def on_gcode_command(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
+		if not self.gcode_command_enable:
+			return 
+		if gcode and gcode.startswith("M106"):
+			speed = self.gcode_parse_speed(cmd)
+			if self.gcode_index_enable:
+				index = self.gcode_parse_index(cmd)
+				if index is not None and speed is not None: 
+					if index == self.gcode_fan_index:
+						self.update_fan_speed(speed)
+			else:
+				if speed is not None:
+					self.update_fan_speed(speed)
+			
+		elif gcode and gcode.startswith("M107"):
+			if self.gcode_index_enable:
+				index = self.gcode_parse_index(cmd)
+				if index is not None: 
+					if index == self.gcode_fan_index:
+						self.update_fan_speed(0.0)
+			else:
+				self.update_fan_speed(0.0)
 
 
 	def get_update_information(self):
@@ -116,6 +200,7 @@ def __plugin_load__():
 
 	global __plugin_hooks__
 	__plugin_hooks__ = {
-		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
+		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
+		"octoprint.comm.protocol.gcode.sent": __plugin_implementation__.on_gcode_command,
 	}
 

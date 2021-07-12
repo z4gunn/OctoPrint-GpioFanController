@@ -1,17 +1,50 @@
 <form class="form-horizontal">
+    
     <div class="control-group-header">
         <h3>FAN Settings</h3>
     </div>
+
     <div class="control-group">
         <label class="control-label">{{ _('Pin #') }}</label>
         <div class="controls">
             <input type="number" class="input-block-level" data-bind="value: settings.plugins.gpiofancontroller.pin">
         </div>
     </div>
+
     <div class="control-group">
         <label class="control-label">{{ _('Frequency') }}</label>
         <div class="controls">
             <input type="number" class="input-block-level" data-bind="value: settings.plugins.gpiofancontroller.freq">
         </div>
     </div>
+
+    <div class="control-group-header">
+        <h3>GCODE Commands</h3>
+    </div>
+    
+    <div class="control-group">
+        <div class="controls">
+            <label class="checkbox">
+                <input type="checkbox" data-bind="checked: settings.plugins.gpiofancontroller.gcode_command_enable">
+                {{ _("Enable M106 and M107 Commands") }}
+            </label>
+        </div>
+    </div>
+
+    <div class="control-group">
+        <div class="controls">
+            <label class="checkbox">
+                <input type="checkbox" data-bind="checked: settings.plugins.gpiofancontroller.gcode_index_enable">
+                {{ _("Enable Fan Index (e.g. M106 P# S255 where # is index)") }}
+            </label>
+        </div>
+    </div>
+
+     <div class="control-group"  data-bind="visible: settings.plugins.gpiofancontroller.gcode_index_enable()">
+        <label class="control-label">{{ _('Fan Index') }}</label>
+        <div class="controls">
+            <input type="number" class="input-block-level" data-bind="value: settings.plugins.gpiofancontroller.gcode_fan_index">
+        </div>
+    </div>    
+    
 </form>

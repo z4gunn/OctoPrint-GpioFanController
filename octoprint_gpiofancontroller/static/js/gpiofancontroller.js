@@ -18,8 +18,14 @@ $(function() {
             }
         }
     
-        self.onBeforeBinding = function() {
-            //self.speed(self.settings.settings.plugins.gpiofancontroller.speed());      
+        self.onBeforeBinding = function() {   
+        }
+
+        self.onDataUpdaterPluginMessage = function(plugin, data) {
+            if(plugin != 'gpiofancontroller') { return }
+            if(data.hasOwnProperty('speed')) {
+                self.speed(data.speed)
+            }
         }
     }
 
