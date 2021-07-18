@@ -1,6 +1,7 @@
 # coding=utf-8
 from __future__ import absolute_import
 import octoprint.plugin
+from gpiozero.pins.rpigpio import RPiGPIOFactory
 from gpiozero import PWMLED
 
 class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
@@ -15,13 +16,14 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 		self.gcode_command_enable = False
 		self.gcode_index_enable = False
 		self.gcode_fan_index = 4
+		self.pin_factory = RPiGPIOFactory()
 
 	
 	def init_fan(self, pin, frequency, speed):
 		try:
 			self.deinit_fan()
-			self.fan = PWMLED(pin=pin, initial_value=speed, frequency=frequency)
-			self._logger.info("PWM pin initialized")
+			self.fan = PWMLED(pin=pin, initial_value=speed, frequency=frequency, pin_factory=self.pin_factory)
+			self._logger.info("PWM pin initialized with pin factory: " + str(self.fan.pin_factory))
 		except:
 			self._logger.error("Error occured while initializing PWM pin")
 
@@ -35,11 +37,12 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 		except:
 			self._logger.error("Error occured while deinitializing PWM pin")
 	
+
 	def update_fan_speed(self, speed):
 		if self.fan is not None:
 			self.speed = speed
 			self.fan.value = self.speed
-			self._plugin_manager.send_plugin_message(self._identifier, dict(speed=self.speed))
+			
 
 	def on_after_startup(self):
 		pin = self._settings.get_int(["pin"])
@@ -165,6 +168,7 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 						self.update_fan_speed(0.0)
 			else:
 				self.update_fan_speed(0.0)
+		self._plugin_manager.send_plugin_message(self._identifier, dict(speed=self.speed))
 
 
 	def get_update_information(self):
