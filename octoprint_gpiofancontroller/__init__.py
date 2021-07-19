@@ -8,7 +8,6 @@ import os
 CPU_FAN_UPDATE_INTERVAL = 5
 CPU_FAN_TEMP_MIN_DEFAULT = 50
 CPU_FAN_TEMP_MAX_DEFAULT = 70
-CPU_FAN_TEMP_HYST_DEFAULT = 3
 CPU_FAN_SPEED_MIN_DEFAULT = 40
 CPU_FAN_SPEED_MAX_DEFAULT = 100
 
@@ -30,9 +29,9 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 		self.cpu_fan_enable = False
 		self.cpu_fan_temp_min = CPU_FAN_TEMP_MIN_DEFAULT
 		self.cpu_fan_temp_max = CPU_FAN_TEMP_MAX_DEFAULT
-		self.cpu_fan_temp_hyst = CPU_FAN_TEMP_HYST_DEFAULT
 		self.cpu_fan_speed_min = CPU_FAN_SPEED_MIN_DEFAULT
 		self.cpu_fan_speed_max = CPU_FAN_SPEED_MAX_DEFAULT
+		self.cpu_fan_old_temp = None
 
 
 	def init_fan(self, pin, frequency, speed):
@@ -76,7 +75,6 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 
 
 	def update_fan_speed(self, speed):
-		self._logger.info("New Fan Speed: " + str(speed))
 		if self.fan is not None and speed >= 0.0 and speed <= 1.0:
 			self.speed = speed
 			self.fan.value = self.speed
@@ -105,9 +103,6 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 		cpu_fan_temp_max = self._settings.get_int(["cpu_fan_temp_max"])
 		if cpu_fan_temp_max is not None:
 			self.cpu_fan_temp_max = cpu_fan_temp_max
-		cpu_fan_temp_hyst = self._settings.get_int(["cpu_fan_temp_hyst"])
-		if cpu_fan_temp_hyst is not None:
-			self.cpu_fan_temp_hyst = cpu_fan_temp_hyst
 		cpu_fan_speed_min = self._settings.get_int(["cpu_fan_speed_min"])
 		if cpu_fan_speed_min is not None:
 			self.cpu_fan_speed_min = cpu_fan_speed_min
@@ -148,9 +143,6 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 		cpu_fan_temp_max = self._settings.get_int(["cpu_fan_temp_max"])
 		if cpu_fan_temp_max is not None:
 			self.cpu_fan_temp_max = cpu_fan_temp_max
-		cpu_fan_temp_hyst = self._settings.get_int(["cpu_fan_temp_hyst"])
-		if cpu_fan_temp_hyst is not None:
-			self.cpu_fan_temp_hyst = cpu_fan_temp_hyst
 		cpu_fan_speed_min = self._settings.get_int(["cpu_fan_speed_min"])
 		if cpu_fan_speed_min is not None:
 			self.cpu_fan_speed_min = cpu_fan_speed_min
@@ -170,7 +162,6 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 			cpu_fan_enable=False,
 			cpu_fan_temp_min=CPU_FAN_TEMP_MIN_DEFAULT,
 			cpu_fan_temp_max=CPU_FAN_TEMP_MAX_DEFAULT,
-			cpu_fan_temp_hyst=CPU_FAN_TEMP_HYST_DEFAULT,
 			cpu_fan_speed_min=CPU_FAN_SPEED_MIN_DEFAULT,
 			cpu_fan_speed_max=CPU_FAN_SPEED_MAX_DEFAULT,
 		)
@@ -262,23 +253,33 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 		try:
 			res = os.popen('vcgencmd measure_temp').readline()
 			new_temp = float(res.replace("temp=","").replace("'C\n",""))
-			self._logger.info("New CPU Temp: " + str(new_temp))
+			#self._logger.info("Old CPU Temp: " + str(self.cpu_fan_old_temp))
+			#self._logger.info("New CPU Temp: " + str(new_temp))
+
+			if self.cpu_fan_old_temp is None:
+				self.cpu_fan_old_temp = new_temp
+				return
 
 			new_speed = self.speed
-			if new_temp > self.cpu_fan_temp_max:
+			old_temp = self.cpu_fan_old_temp
+			self.cpu_fan_old_temp = new_temp
+			if new_temp > self.cpu_fan_temp_max and old_temp > self.cpu_fan_temp_max:
 				new_speed = float(self.cpu_fan_speed_max) / 100.0
-			elif new_temp < self.cpu_fan_temp_min:
+			elif new_temp < self.cpu_fan_temp_min and old_temp < self.cpu_fan_speed_min:
 				new_speed = 0.0
-			else:
+			elif new_temp >= self.cpu_fan_temp_min and new_temp <= self.cpu_fan_temp_max and old_temp >= self.cpu_fan_temp_min and old_temp <= self.cpu_fan_temp_max:
 				speed_range = (float(self.cpu_fan_speed_max) / 100.0) - (float(self.cpu_fan_speed_min) / 100.0)
 				temp_range = float(self.cpu_fan_temp_max) - float(self.cpu_fan_temp_min)
 				slope = speed_range / temp_range
 				y_int = (float(self.cpu_fan_speed_max) / 100.0) - slope * float(self.cpu_fan_temp_max)
 				new_speed = slope * new_temp + y_int
+			else:
+				return
 
+			#self._logger.info("New Fan Speed: " + str(new_speed))
 			self.update_fan_speed(new_speed)
 			self._plugin_manager.send_plugin_message(self._identifier, dict(speed=self.speed))
-		
+			
 		except:
 			self._logger.error("Error occurred while updating CPU fan speed")
 
