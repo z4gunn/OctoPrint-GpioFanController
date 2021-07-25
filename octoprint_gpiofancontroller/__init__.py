@@ -3,12 +3,20 @@ from __future__ import absolute_import
 import octoprint.plugin
 from gpiozero.pins.rpigpio import RPiGPIOFactory
 from gpiozero import PWMLED
+import os
+
+CPU_FAN_UPDATE_INTERVAL = 5
+CPU_FAN_TEMP_MIN_DEFAULT = 50
+CPU_FAN_TEMP_MAX_DEFAULT = 70
+CPU_FAN_SPEED_MIN_DEFAULT = 40
+CPU_FAN_SPEED_MAX_DEFAULT = 100
 
 class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 							  octoprint.plugin.SettingsPlugin,
                               octoprint.plugin.AssetPlugin,
                               octoprint.plugin.TemplatePlugin,
-							  octoprint.plugin.SimpleApiPlugin):
+							  octoprint.plugin.SimpleApiPlugin,
+							  octoprint.plugin.ShutdownPlugin):
 
 	def __init__(self):
 		self.fan = None
@@ -17,29 +25,57 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 		self.gcode_index_enable = False
 		self.gcode_fan_index = 4
 		self.pin_factory = RPiGPIOFactory()
+		self.cpu_fan_timer = None
+		self.cpu_fan_enable = False
+		self.cpu_fan_temp_min = CPU_FAN_TEMP_MIN_DEFAULT
+		self.cpu_fan_temp_max = CPU_FAN_TEMP_MAX_DEFAULT
+		self.cpu_fan_speed_min = CPU_FAN_SPEED_MIN_DEFAULT
+		self.cpu_fan_speed_max = CPU_FAN_SPEED_MAX_DEFAULT
+		self.cpu_fan_old_temp = None
 
-	
+
 	def init_fan(self, pin, frequency, speed):
 		try:
 			self.deinit_fan()
 			self.fan = PWMLED(pin=pin, initial_value=speed, frequency=frequency, pin_factory=self.pin_factory)
 			self._logger.info("PWM pin initialized with pin factory: " + str(self.fan.pin_factory))
 		except:
-			self._logger.error("Error occured while initializing PWM pin")
+			self._logger.error("Error occurred while initializing PWM pin")
 
 
 	def deinit_fan(self):
 		try:
-			if(self.fan is not None):
+			if self.fan is not None:
 				self.fan.close()
 				self.fan = None
 				self._logger.info("PWM pin deinitialized")
 		except:
-			self._logger.error("Error occured while deinitializing PWM pin")
-	
+			self._logger.error("Error occurred while deinitializing PWM pin")
+
+
+	def start_cpu_fan_timer(self):
+		try:
+			self.stop_cpu_fan_timer()
+			if self.cpu_fan_enable:
+				self.cpu_fan_timer = octoprint.util.RepeatedTimer(CPU_FAN_UPDATE_INTERVAL, self.update_cpu_fan_speed, run_first=True,)
+				self.cpu_fan_timer.start()
+				self._logger.info("CPU fan update timer started")
+		except:
+			self._logger.error("Error occurred while starting cpu fan update timer")
+
+
+	def stop_cpu_fan_timer(self):
+		try:
+			if self.cpu_fan_timer is not None:
+				self.cpu_fan_timer.cancel()
+				self.cpu_fan_timer = None
+				self._logger.info("CPU fan update timer stopped")
+		except:
+			self._logger.error("Error occurred while stopping cpu fan update timer")
+
 
 	def update_fan_speed(self, speed):
-		if self.fan is not None:
+		if self.fan is not None and speed >= 0.0 and speed <= 1.0:
 			self.speed = speed
 			self.fan.value = self.speed
 			
@@ -58,6 +94,27 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 		gcode_fan_index = self._settings.get_int(["gcode_fan_index"])
 		if gcode_fan_index is not None:
 			self.gcode_fan_index = gcode_fan_index
+		cpu_fan_enable = self._settings.get_boolean(["cpu_fan_enable"])
+		if cpu_fan_enable is not None:
+			self.cpu_fan_enable = cpu_fan_enable
+		cpu_fan_temp_min = self._settings.get_int(["cpu_fan_temp_min"])
+		if cpu_fan_temp_min is not None:
+			self.cpu_fan_temp_min = cpu_fan_temp_min
+		cpu_fan_temp_max = self._settings.get_int(["cpu_fan_temp_max"])
+		if cpu_fan_temp_max is not None:
+			self.cpu_fan_temp_max = cpu_fan_temp_max
+		cpu_fan_speed_min = self._settings.get_int(["cpu_fan_speed_min"])
+		if cpu_fan_speed_min is not None:
+			self.cpu_fan_speed_min = cpu_fan_speed_min
+		cpu_fan_speed_max = self._settings.get_int(["cpu_fan_speed_max"])
+		if cpu_fan_speed_max is not None:
+			self.cpu_fan_speed_max = cpu_fan_speed_max
+		self.start_cpu_fan_timer()
+
+
+	def on_shutdown(self):
+		self.stop_cpu_fan_timer()
+		self.deinit_fan()
 
 
 	def on_settings_save(self, data):
@@ -67,7 +124,7 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 		if pin is not None and freq is not None and self.speed is not None:
 			self.init_fan(pin, freq, self.speed)
 		else:
-			self._logger.error("Error occured while initializing PWM pin")
+			self._logger.error("Error occurred while initializing PWM pin")
 		gcode_command_enable = self._settings.get_boolean(["gcode_command_enable"])
 		if gcode_command_enable is not None:
 			self.gcode_command_enable = gcode_command_enable
@@ -77,8 +134,24 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 		gcode_fan_index = self._settings.get_int(["gcode_fan_index"])
 		if gcode_fan_index is not None:
 			self.gcode_fan_index = gcode_fan_index
-
-
+		cpu_fan_enable = self._settings.get_boolean(["cpu_fan_enable"])
+		if cpu_fan_enable is not None:
+			self.cpu_fan_enable = cpu_fan_enable
+		cpu_fan_temp_min = self._settings.get_int(["cpu_fan_temp_min"])
+		if cpu_fan_temp_min is not None:
+			self.cpu_fan_temp_min = cpu_fan_temp_min
+		cpu_fan_temp_max = self._settings.get_int(["cpu_fan_temp_max"])
+		if cpu_fan_temp_max is not None:
+			self.cpu_fan_temp_max = cpu_fan_temp_max
+		cpu_fan_speed_min = self._settings.get_int(["cpu_fan_speed_min"])
+		if cpu_fan_speed_min is not None:
+			self.cpu_fan_speed_min = cpu_fan_speed_min
+		cpu_fan_speed_max = self._settings.get_int(["cpu_fan_speed_max"])
+		if cpu_fan_speed_max is not None:
+			self.cpu_fan_speed_max = cpu_fan_speed_max
+		self.start_cpu_fan_timer()
+		
+		
 	def get_settings_defaults(self):
 		return dict(
 			pin=17,
@@ -86,6 +159,11 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 			gcode_command_enable=False,
 			gcode_index_enable=False,
 			gcode_fan_index=4,
+			cpu_fan_enable=False,
+			cpu_fan_temp_min=CPU_FAN_TEMP_MIN_DEFAULT,
+			cpu_fan_temp_max=CPU_FAN_TEMP_MAX_DEFAULT,
+			cpu_fan_speed_min=CPU_FAN_SPEED_MIN_DEFAULT,
+			cpu_fan_speed_max=CPU_FAN_SPEED_MAX_DEFAULT,
 		)
 
 
@@ -169,6 +247,41 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 			else:
 				self.update_fan_speed(0.0)
 		self._plugin_manager.send_plugin_message(self._identifier, dict(speed=self.speed))
+
+
+	def update_cpu_fan_speed(self):
+		try:
+			res = os.popen('vcgencmd measure_temp').readline()
+			new_temp = float(res.replace("temp=","").replace("'C\n",""))
+			#self._logger.info("Old CPU Temp: " + str(self.cpu_fan_old_temp))
+			#self._logger.info("New CPU Temp: " + str(new_temp))
+
+			if self.cpu_fan_old_temp is None:
+				self.cpu_fan_old_temp = new_temp
+				return
+
+			new_speed = self.speed
+			old_temp = self.cpu_fan_old_temp
+			self.cpu_fan_old_temp = new_temp
+			if new_temp > self.cpu_fan_temp_max and old_temp > self.cpu_fan_temp_max:
+				new_speed = float(self.cpu_fan_speed_max) / 100.0
+			elif new_temp < self.cpu_fan_temp_min and old_temp < self.cpu_fan_speed_min:
+				new_speed = 0.0
+			elif new_temp >= self.cpu_fan_temp_min and new_temp <= self.cpu_fan_temp_max and old_temp >= self.cpu_fan_temp_min and old_temp <= self.cpu_fan_temp_max:
+				speed_range = (float(self.cpu_fan_speed_max) / 100.0) - (float(self.cpu_fan_speed_min) / 100.0)
+				temp_range = float(self.cpu_fan_temp_max) - float(self.cpu_fan_temp_min)
+				slope = speed_range / temp_range
+				y_int = (float(self.cpu_fan_speed_max) / 100.0) - slope * float(self.cpu_fan_temp_max)
+				new_speed = slope * new_temp + y_int
+			else:
+				return
+
+			#self._logger.info("New Fan Speed: " + str(new_speed))
+			self.update_fan_speed(new_speed)
+			self._plugin_manager.send_plugin_message(self._identifier, dict(speed=self.speed))
+			
+		except:
+			self._logger.error("Error occurred while updating CPU fan speed")
 
 
 	def get_update_information(self):

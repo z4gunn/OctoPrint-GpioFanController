@@ -7,6 +7,7 @@ This is a lightweight plugin dedicated for controlling a fan via Raspberry Pi GP
 * Pin selection via settings
 * M106 / M107 GCODE support
 * Independent GCODE control using optional fan index
+* Optional proportional speed mode based on CPU temperature
 
 
 ## Setup

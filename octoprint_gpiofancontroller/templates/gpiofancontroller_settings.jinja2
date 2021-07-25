@@ -3,21 +3,21 @@
     <div class="control-group-header">
         <h3>FAN Settings</h3>
     </div>
-
+    
     <div class="control-group">
-        <label class="control-label">{{ _('Pin #') }}</label>
+        <label class="control-label">{{ _("Pin #") }}</label>
         <div class="controls">
             <input type="number" class="input-block-level" data-bind="value: settings.plugins.gpiofancontroller.pin">
         </div>
     </div>
-
+    
     <div class="control-group">
-        <label class="control-label">{{ _('Frequency') }}</label>
+        <label class="control-label">{{ _("Frequency") }}</label>
         <div class="controls">
             <input type="number" class="input-block-level" data-bind="value: settings.plugins.gpiofancontroller.freq">
         </div>
     </div>
-
+    
     <div class="control-group-header">
         <h3>GCODE Settings</h3>
     </div>
@@ -30,7 +30,7 @@
             </label>
         </div>
     </div>
-
+    
     <div class="control-group">
         <div class="controls">
             <label class="checkbox">
@@ -39,12 +39,53 @@
             </label>
         </div>
     </div>
-
-     <div class="control-group"  data-bind="visible: settings.plugins.gpiofancontroller.gcode_index_enable()">
-        <label class="control-label">{{ _('Fan Index') }}</label>
+    
+    <div class="control-group"  data-bind="visible: settings.plugins.gpiofancontroller.gcode_index_enable()">
+        <label class="control-label">{{ _("Fan Index") }}</label>
         <div class="controls">
             <input type="number" class="input-block-level" data-bind="value: settings.plugins.gpiofancontroller.gcode_fan_index">
         </div>
-    </div>    
+    </div>  
+
+    <div class="control-group-header">
+        <h3>CPU Fan Settings</h3>
+    </div>
+    
+    <div class="control-group">
+        <div class="controls">
+            <label class="checkbox">
+                <input type="checkbox" data-bind="checked: settings.plugins.gpiofancontroller.cpu_fan_enable">
+                {{ _("Enable CPU Fan Mode") }}
+            </label>
+        </div>
+    </div>  
+
+    <div class="control-group"  data-bind="visible: settings.plugins.gpiofancontroller.cpu_fan_enable()">
+        <label class="control-label">{{ _("Min Temp (deg C)") }}</label>
+        <div class="controls">
+            <input type="number" class="input-block-level" data-bind="value: settings.plugins.gpiofancontroller.cpu_fan_temp_min">
+        </div>
+    </div>  
+
+    <div class="control-group"  data-bind="visible: settings.plugins.gpiofancontroller.cpu_fan_enable()">
+        <label class="control-label">{{ _("Max Temp (deg C)") }}</label>
+        <div class="controls">
+            <input type="number" class="input-block-level" data-bind="value: settings.plugins.gpiofancontroller.cpu_fan_temp_max">
+        </div>
+    </div>  
+
+     <div class="control-group"  data-bind="visible: settings.plugins.gpiofancontroller.cpu_fan_enable()">
+        <label class="control-label">{{ _("Min Speed (Percent)") }}</label>
+        <div class="controls">
+            <input type="number" class="input-block-level" data-bind="value: settings.plugins.gpiofancontroller.cpu_fan_speed_min">
+        </div>
+    </div>  
+
+    <div class="control-group"  data-bind="visible: settings.plugins.gpiofancontroller.cpu_fan_enable()">
+        <label class="control-label">{{ _("Max Speed (Percent)") }}</label>
+        <div class="controls">
+            <input type="number" class="input-block-level" data-bind="value: settings.plugins.gpiofancontroller.cpu_fan_speed_max">
+        </div>
+    </div>  
     
 </form>
