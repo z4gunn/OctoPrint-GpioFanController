@@ -76,6 +76,8 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
                 "Error occurred while stopping cpu fan update timer")
 
     def update_fan_speed(self, speed):
+        self._logger.debug(
+            "Updating fan speed from {} to {}".format(self.speed, speed))
         if self.fan is not None and speed >= 0.0 and speed <= 1.0:
             self.speed = speed
             self.fan.value = self.speed
@@ -182,6 +184,8 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
 
     def on_api_command(self, command, data):
         if command == "update_speed":
+            self._logger.debug(
+                "Received update_speed API command: {}".format(data))
             speedStr = data.get('speed', None)
             if speedStr != None:
                 speed = float(speedStr)
@@ -217,27 +221,32 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
                 return None
 
     def on_gcode_command(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
-        if not self.gcode_command_enable:
+        if not self.gcode_command_enable or not gcode:
             return
-        if gcode and gcode.startswith("M106"):
+        if gcode.startswith("M106"):
             speed = self.gcode_parse_speed(cmd)
+            self._logger.debug(
+                "Received gcode M106: {}".format(speed))
+            if speed is None:
+                return
             if self.gcode_index_enable:
                 index = self.gcode_parse_index(cmd)
-                if index is not None and speed is not None:
-                    if index == self.gcode_fan_index:
-                        self.update_fan_speed(speed)
-            else:
-                if speed is not None:
-                    self.update_fan_speed(speed)
+                self._logger.debug(
+                    "Checking index is {}: {}".format(self.gcode_fan_index, index))
+                if index is None or index != self.gcode_fan_index:
+                    return
+            self.update_fan_speed(speed)
 
-        elif gcode and gcode.startswith("M107"):
+        elif gcode.startswith("M107"):
+            self._logger.debug("Received gcode M107")
             if self.gcode_index_enable:
                 index = self.gcode_parse_index(cmd)
-                if index is not None:
-                    if index == self.gcode_fan_index:
-                        self.update_fan_speed(0.0)
-            else:
-                self.update_fan_speed(0.0)
+                self._logger.debug(
+                    "Checking index is {}: {}".format(self.gcode_fan_index, index))
+                if index is None or index != self.gcode_fan_index:
+                    return
+            self.update_fan_speed(0.0)
+
         self._plugin_manager.send_plugin_message(
             self._identifier, dict(speed=self.speed))
 
@@ -245,8 +254,8 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
         try:
             res = os.popen('vcgencmd measure_temp').readline()
             new_temp = float(res.replace("temp=", "").replace("'C\n", ""))
-            # self._logger.info("Old CPU Temp: " + str(self.cpu_fan_old_temp))
-            # self._logger.info("New CPU Temp: " + str(new_temp))
+            self._logger.debug("Old CPU Temp: " + str(self.cpu_fan_old_temp))
+            self._logger.debug("New CPU Temp: " + str(new_temp))
 
             if self.cpu_fan_old_temp is None:
                 self.cpu_fan_old_temp = new_temp
@@ -271,7 +280,7 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
             else:
                 return
 
-            # self._logger.info("New Fan Speed: " + str(new_speed))
+            self._logger.debug("New Fan Speed: " + str(new_speed))
             self.update_fan_speed(new_speed)
             self._plugin_manager.send_plugin_message(
                 self._identifier, dict(speed=self.speed))
