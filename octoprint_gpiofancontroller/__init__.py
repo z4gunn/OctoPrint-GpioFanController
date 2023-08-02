@@ -194,7 +194,7 @@ class GpiofancontrollerPlugin(octoprint.plugin.StartupPlugin,
             return None
         else:
             try:
-                speed = int(params[1].split()[0])
+                speed = float(params[1].split()[0])
                 if speed < 0 or speed > 255:
                     return None
                 else:
